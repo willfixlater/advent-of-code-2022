@@ -1,4 +1,4 @@
-(ns advent-of-code.08-01
+(ns advent-of-code.08-02
   (:require [clojure.core.matrix :as matrix]
             [clojure.core.matrix.operators :as matrix.operators]
             [advent-of-code.lib :as aoc.lib]))
@@ -19,13 +19,15 @@
       (recur (conj new (mapv #(nth % idx) mat))
              (dec idx)))))
 
-(defn visibility-sweep [mat]
+(defn scenic-sweep [mat]
   (mapv (fn [row]
           (first
-           (reduce (fn [[bitrow tallest] tree]
-                     [(conj bitrow (if (> tree tallest) 0 1))
-                      (max tallest tree)])
-                   [[] -1]
+           (reduce (fn [[scored-row prev] tree]
+                     (let [[low blocked] (split-with #(< % tree) prev)
+                           score (+ (count low) (count (take 1 blocked)))]
+                       [(conj scored-row score)
+                        (conj prev tree)]))
+                   [[] '()]
                    row)))
         mat))
 
@@ -34,18 +36,20 @@
         grid (mapv (fn [line]
                      (mapv #(Character/digit % 10) line))
                    input)
-        left-bm (visibility-sweep grid)
+        left-scored (scenic-sweep grid)
         grid (rotate-ccw grid)
-        top-bm (rotate-cw (visibility-sweep grid))
+        top-scored (rotate-cw (scenic-sweep grid))
         grid (rotate-ccw grid)
-        right-bm (-> (visibility-sweep grid)
-                     rotate-cw
-                     rotate-cw)
+        right-scored (-> (scenic-sweep grid)
+                         rotate-cw
+                         rotate-cw)
         grid (rotate-ccw grid)
-        bottom-bm (rotate-ccw (visibility-sweep grid))
-        visibility-bm (matrix.operators/* left-bm top-bm right-bm bottom-bm)]
-    (- (matrix/ecount grid)
-       (reduce + (map #(reduce + %) visibility-bm)))))
+        bottom-scored (rotate-ccw (scenic-sweep grid))
+        all-scored (matrix.operators/* left-scored
+                                       top-scored
+                                       right-scored
+                                       bottom-scored)]
+    (matrix/emax all-scored)))
 
 (defn -main []
   (aoc.lib/run-and-save-result solution))
